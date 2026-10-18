@@ -31,8 +31,10 @@
         </service>
         <receiver android:name="com.masselis.tpmsadvanced.feature.background.interfaces.SilenceAlertsReceiver"
             android:exported="false" />
-        <receiver android:name="com.masselis.tpmsadvanced.feature.background.interfaces.DisableMonitorBroadcastReceiver" />
-        <receiver android:name="com.masselis.tpmsadvanced.feature.background.interfaces.RestartAppBroadcastReceiver" />
+        <receiver android:name="com.masselis.tpmsadvanced.feature.background.interfaces.DisableMonitorBroadcastReceiver"
+            android:exported="false" />
+        <receiver android:name="com.masselis.tpmsadvanced.feature.background.interfaces.RestartAppBroadcastReceiver"
+            android:exported="false" />
 
         <!-- https://developer.android.com/about/versions/14/changes/fgs-types-required#connected-device -->
         <service

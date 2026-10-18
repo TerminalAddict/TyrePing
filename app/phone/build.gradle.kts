@@ -54,6 +54,7 @@ rootProject.file("secrets/publisher-service-account.json").takeIf { it.exists() 
 android {
     defaultConfig {
         applicationId = "nz.paulwillard.tyreping"
+        targetSdk = libs.versions.sdk.target.get().toInt()
         namespace = "com.masselis.tpmsadvanced"
     }
     keys(keysFile.asFile)?.also { keys ->
@@ -69,7 +70,8 @@ android {
         versionNameSuffix = "-debug"
     }
     buildTypes.getByName("release") {
-        signingConfig = signingConfigs.findByName("release") ?: signingConfigs["debug"]
+        // Without release credentials, assemble an unsigned artifact. Never impersonate a release with a debug key.
+        signingConfig = signingConfigs.findByName("release")
         isMinifyEnabled = true
         isShrinkResources = true
         proguardFiles(

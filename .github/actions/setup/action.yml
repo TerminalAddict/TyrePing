@@ -28,7 +28,7 @@ runs:
     # downloading its own JDK distribution and also because some tools used by
     # "android-actions/setup-android" need a JVM.
     - name: Set up bootstrap JDK
-      uses: actions/setup-java@v6
+      uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
       with:
         distribution: temurin
         # JDK used by Gradle to run on is always fetch from gradle-daemon-jvm.properties.
@@ -37,7 +37,7 @@ runs:
         java-version: 21
 
     - name: Setup Android SDK Tools
-      uses: android-actions/setup-android@v4
+      uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
       with:
         log-accepted-android-sdk-licenses: false # Cleans the log output
         # The default "tools platform-tools" package set fails: Google removed
@@ -49,4 +49,4 @@ runs:
       run: npm install -g @bitwarden/cli@2026.6.0
 
     - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v5
+      uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5

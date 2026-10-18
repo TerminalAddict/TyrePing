@@ -4,6 +4,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.masselis.tpmsadvanced.core.common.appGraph
 import com.masselis.tpmsadvanced.core.database.QueryList.Companion.asList
 import com.masselis.tpmsadvanced.data.vehicle.model.Vehicle
+import com.masselis.tpmsadvanced.data.vehicle.interfaces.VehicleDatabase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.test.runTest
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesTo
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -44,6 +49,17 @@ internal class UniqueCurrentVehicleTest {
     }
 
     private fun carList() = debugVehicleQueries.carList().executeAsList()
+
+    @Test
+    fun concurrentDeletionsPreserveOneUsableCurrentVehicle() = runTest {
+        val repository = VehicleDatabase(database)
+        repository.insert(UUID.randomUUID(), Vehicle.Kind.CAR, "Second", false)
+        val ids = repository.selectAll().execute().map { it.uuid }
+        val results = ids.map { id -> async(Dispatchers.IO) { repository.prepareDeletion(id) } }.awaitAll()
+        assertEquals(1, results.count { it })
+        assertEquals(1, repository.selectAll().execute().size)
+        assertEquals(repository.selectAll().execute().single().uuid, repository.currentVehicle().execute().uuid)
+    }
 
     @Test
     fun default() {

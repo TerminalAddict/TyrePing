@@ -16,11 +16,15 @@ import org.gradle.kotlin.dsl.register
 public class GithubPlugin : Plugin<Project> {
     override fun apply(project: Project) {
         val ext = project.extensions.create<GithubExtension>("github")
+        ext.repository.convention(project.providers.environmentVariable("GITHUB_REPOSITORY")
+            .orElse(project.providers.gradleProperty("github.repository"))
+            .map(GithubApi::validateRepository))
 
         val upsertGithubPreRelease =
             project.tasks.register<CreateRelease>("createGithubPreRelease") {
                 dependsOn("tagCommitWithCurrentVersion")
                 githubToken = ext.githubToken
+                repository = ext.repository
                 tagName = ext.currentReleaseTag
                 lastReleaseCommitSha = ext.lastReleaseCommitSha
                 preRelease = true
@@ -28,19 +32,21 @@ public class GithubPlugin : Plugin<Project> {
         val upsertGithubRelease = project.tasks.register<CreateRelease>("createGithubRelease") {
             dependsOn("tagCommitWithCurrentVersion")
             githubToken = ext.githubToken
+            repository = ext.repository
             tagName = ext.currentReleaseTag
             lastReleaseCommitSha = ext.lastReleaseCommitSha
             preRelease = false
         }.get()
         project.tasks.register<OpenBackMergePullRequest>("openBackMergePullRequest") {
             githubToken = ext.githubToken
+            repository = ext.repository
             source = ext.backMergeSource
             target = ext.backMergeTarget
         }
         project.subprojects {
             plugins.all {
                 if (this is AppPlugin) configure<ApplicationAndroidComponentsExtension> {
-                    onVariants { variant ->
+                    onVariants(selector().withBuildType("release")) { variant ->
                         upsertGithubPreRelease.dependsOn("${this@subprojects.path}:assemble${variant.name.capitalized()}")
                         upsertGithubRelease.dependsOn("${this@subprojects.path}:assemble${variant.name.capitalized()}")
                         upsertGithubPreRelease.builtArtifactsLoader = variant.artifacts.getBuiltArtifactsLoader()

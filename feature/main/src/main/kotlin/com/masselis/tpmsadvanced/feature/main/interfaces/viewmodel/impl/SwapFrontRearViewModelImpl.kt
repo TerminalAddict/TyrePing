@@ -48,8 +48,7 @@ internal class SwapFrontRearViewModelImpl(
             if (state is State.LastUsage && now().minus(state.instant) < 5.seconds)
                 return@launch
 
-            swapFrontRearUseCase.swap()
-            eventChannel.send(Event.SensorsSwapped)
+            if (swapFrontRearUseCase.swap()) eventChannel.send(Event.SensorsSwapped)
         }
     }
 }

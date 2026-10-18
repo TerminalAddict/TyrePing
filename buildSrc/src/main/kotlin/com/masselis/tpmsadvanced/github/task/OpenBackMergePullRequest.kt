@@ -1,5 +1,6 @@
 package com.masselis.tpmsadvanced.github.task
 
+import com.masselis.tpmsadvanced.github.GithubApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -12,9 +13,7 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.TaskAction
-import org.gradle.process.ExecOperations
-import java.io.ByteArrayOutputStream
-import javax.inject.Inject
+import org.gradle.api.tasks.Internal
 
 /**
  * Opens (or reuses) a pull request merging [source] into [target] and enables GitHub's auto-merge
@@ -24,16 +23,17 @@ import javax.inject.Inject
  *
  * REST has no "enable auto-merge" endpoint, and no way to pin the merge method at all - only the
  * `enablePullRequestAutoMerge` GraphQL mutation supports `mergeMethod: MERGE` (as opposed to
- * squash/rebase, which would each retire one of the two branches). Both calls are plain `curl` via
- * `ExecOperations`.
+ * squash/rebase, which would each retire one of the two branches). Both calls use authenticated HTTPS without subprocess credentials or redirects.
  */
 internal abstract class OpenBackMergePullRequest : DefaultTask() {
 
-    @get:Inject
-    protected abstract val execOperations: ExecOperations
+    @get:Internal
+    abstract val githubToken: Property<String>
 
     @get:Input
-    abstract val githubToken: Property<String>
+    abstract val repository: Property<String>
+
+    private val api: GithubApi get() = GithubApi(githubToken.get(), repository.get())
 
     @get:Input
     abstract val source: Property<String>
@@ -48,9 +48,9 @@ internal abstract class OpenBackMergePullRequest : DefaultTask() {
     }
 
     @TaskAction
-    internal fun process() = curl(
-        "-X", "GET",
-        "$REPOSITORY_API/git/ref/heads/${source.get()}",
+    internal fun process() = api.request(
+        "GET",
+        "/git/ref/heads/${GithubApi.encode(source.get())}",
     )
         .let { Json.decodeFromString<JsonObject>(it) }
         .let { sourceRef ->
@@ -66,16 +66,16 @@ internal abstract class OpenBackMergePullRequest : DefaultTask() {
             // runs as the auto-merge enabler who may bypass them). A disposable branch pinned on
             // the same commit produces the exact same merge commit and is free to be deleted.
             "chore/back-merge-${source.get()}-${sourceSha.take(SHORT_SHA_LENGTH)}".also { head ->
-                curl(
-                    "-X", "POST",
-                    "$REPOSITORY_API/git/refs",
-                    "-d",
+                api.request(
+                    "POST",
+                    "/git/refs",
                     JsonObject(
                         mapOf(
                             "ref" to JsonPrimitive("refs/heads/$head"),
                             "sha" to JsonPrimitive(sourceSha),
                         )
                     ).toString(),
+                    acceptedErrors = setOf(422),
                 )
                     .let { Json.decodeFromString<JsonObject>(it) }
                     .also { refCreationResponse ->
@@ -88,10 +88,9 @@ internal abstract class OpenBackMergePullRequest : DefaultTask() {
             }
         }
         .let { head ->
-            curl(
-                "-X", "POST",
-                "$REPOSITORY_API/pulls",
-                "-d",
+            api.request(
+                "POST",
+                "/pulls",
                 JsonObject(
                     mapOf(
                         "title" to JsonPrimitive("chore(gitflow): back-merge ${source.get()} into ${target.get()}"),
@@ -103,6 +102,7 @@ internal abstract class OpenBackMergePullRequest : DefaultTask() {
                         ),
                     )
                 ).toString(),
+                acceptedErrors = setOf(422),
             )
                 .let { Json.decodeFromString<JsonObject>(it) }
                 .let { prCreationResponse ->
@@ -116,14 +116,14 @@ internal abstract class OpenBackMergePullRequest : DefaultTask() {
 
                         errorMessages.any { "No commits between" in it } -> {
                             logger.lifecycle("Nothing to back-merge: \"${source.get()}\" and \"${target.get()}\" are already in sync")
-                            curl("-X", "DELETE", "$REPOSITORY_API/git/refs/heads/$head")
+                            api.request("DELETE", "/git/refs/heads/${GithubApi.encode(head)}")
                             null
                         }
 
                         errorMessages.any { "A pull request already exists" in it } ->
-                            curl(
-                                "-X", "GET",
-                                "$REPOSITORY_API/pulls?head=VincentMasselis:$head&base=${target.get()}&state=open",
+                            api.request(
+                                "GET",
+                                "/pulls?head=${GithubApi.encode("${api.owner}:$head")}&base=${GithubApi.encode(target.get())}&state=open",
                             ).let { Json.decodeFromString<JsonArray>(it) }
                                 .let { prSearchResponse ->
                                     prSearchResponse.singleOrNull()
@@ -138,16 +138,13 @@ internal abstract class OpenBackMergePullRequest : DefaultTask() {
                 }
         }
         ?.let { pullRequestNodeId ->
-            curl(
-                "-X", "POST",
-                "https://api.github.com/graphql",
-                "-d",
+            api.graphql(
                 JsonObject(
                     mapOf(
                         "query" to JsonPrimitive(
                             """
                                         mutation {
-                                            enablePullRequestAutoMerge(input: {pullRequestId: "$pullRequestNodeId", mergeMethod: MERGE}) {
+                                            enablePullRequestAutoMerge(input: {pullRequestId: ${JsonPrimitive(pullRequestNodeId)}, mergeMethod: MERGE}) {
                                                 pullRequest { number }
                                             }
                                         }
@@ -158,31 +155,14 @@ internal abstract class OpenBackMergePullRequest : DefaultTask() {
             )
         }
         ?.also { autoMergeResponse ->
-            // GraphQL returns HTTP 200 even on a logical failure - curl's exit code proves
+            // GraphQL returns HTTP 200 even on a logical failure - HTTP success proves
             // nothing, the "errors" field must be checked explicitly.
             check(Json.decodeFromString<JsonObject>(autoMergeResponse).containsKey("errors").not()) {
                 "Failed to enable auto-merge: $autoMergeResponse"
             }
         }
 
-    private fun curl(vararg args: String): String = ByteArrayOutputStream()
-        .also { stdout ->
-            execOperations.exec {
-                commandLine(
-                    listOf(
-                        "curl", "-L",
-                        "-H", "Accept: application/vnd.github+json",
-                        "-H", "Authorization: Bearer ${githubToken.get()}",
-                        "-H", "X-GitHub-Api-Version: 2022-11-28",
-                    ) + args
-                )
-                standardOutput = stdout
-            }
-        }
-        .use { it.toString() }
-
     private companion object {
-        private const val REPOSITORY_API = "https://api.github.com/repos/VincentMasselis/TPMS-advanced"
         private const val SHORT_SHA_LENGTH = 7
     }
 }

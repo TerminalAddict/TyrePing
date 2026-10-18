@@ -40,3 +40,4 @@ buildSrc/build/**
 .idea/markdown.xml
 secrets/**
 app/phone/google-services.json
+__pycache__/

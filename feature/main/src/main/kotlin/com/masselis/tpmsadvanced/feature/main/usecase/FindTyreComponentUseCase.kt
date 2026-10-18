@@ -11,6 +11,7 @@ import com.masselis.tpmsadvanced.data.vehicle.model.Location.Wheel.REAR_LEFT
 import com.masselis.tpmsadvanced.data.vehicle.model.Location.Wheel.REAR_RIGHT
 import com.masselis.tpmsadvanced.data.vehicle.model.Vehicle
 import com.masselis.tpmsadvanced.feature.main.ioc.tyre.TyreComponent
+import java.util.concurrent.ConcurrentHashMap
 
 @Suppress("LongParameterList")
 internal class FindTyreComponentUseCase(
@@ -25,13 +26,13 @@ internal class FindTyreComponentUseCase(
     private val right: Lazy<TyreComponent>,
     private val additional: (Location.Auxiliary) -> TyreComponent,
 ) : (Location) -> TyreComponent {
-    private val extra = mutableMapOf<Location.Auxiliary, TyreComponent>()
+    private val extra = ConcurrentHashMap<Location.Auxiliary, TyreComponent>()
     override fun invoke(location: Location): TyreComponent {
-        assert(vehicle.kind.locations.contains(location)) {
+        require(vehicle.kind.locations.contains(location)) {
             "Cannot get a TyreComponent for the filled location $location according to the vehicle kind ${vehicle.kind}"
         }
         return when (location) {
-            is Location.Auxiliary -> lazy { extra.getOrPut(location) { additional(location) } }
+            is Location.Auxiliary -> return extra.computeIfAbsent(location, additional)
             is Location.Wheel -> when (location) {
                 FRONT_LEFT -> frontLeft
                 FRONT_RIGHT -> frontRight

@@ -132,6 +132,12 @@ public object Bindings {
         ) {
             val delegate = AndroidSqliteDriver.Callback(Database.Schema)
 
+            override fun onCreate(db: SupportSQLiteDatabase) {
+                super.onCreate(db)
+                // The schema fixture has a stable seed; real installations need independent vehicle identities.
+                db.execSQL("UPDATE Vehicle SET uuid = ?", arrayOf(UUID.randomUUID().toString()))
+            }
+
             override fun onConfigure(db: SupportSQLiteDatabase) {
                 delegate.onConfigure(db)
                 db.setForeignKeyConstraintsEnabled(true)

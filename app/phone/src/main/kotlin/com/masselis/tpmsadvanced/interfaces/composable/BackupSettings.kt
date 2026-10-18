@@ -21,6 +21,7 @@ import com.masselis.tpmsadvanced.data.vehicle.model.ConfigurationBackup
 import com.masselis.tpmsadvanced.feature.background.interfaces.ui.stopMonitoringForRestore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -100,9 +101,11 @@ internal fun BackupSettings() {
                 scope.launch {
                     busy = true
                     try {
-                        stopMonitoringForRestore(context)
-                        repository.restore(backup)
-                        context.restartApp()
+                        withContext(NonCancellable) {
+                            stopMonitoringForRestore(context)
+                            repository.restore(backup)
+                            context.restartApp()
+                        }
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (failure: Exception) { message = "Restore failed: ${failure.message}"; pending = null }
                     finally { busy = false }

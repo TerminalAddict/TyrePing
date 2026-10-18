@@ -1,3 +1,68 @@
+# Security review validation — 19 October 2026
+
+See [SECURITY_REVIEW.md](SECURITY_REVIEW.md) for severity, affected boundaries, changes and remaining risks.
+The feature-batch records below are historical checkpoints; the results here describe the current tree.
+
+Host validation completed:
+
+- **325 JVM tests passed**: buildSrc 43; core common 9; data vehicle 113; main 77; background 47;
+  QR 8; unlocated 24; Android Auto 2; phone 2. Zero failures, errors or skipped tests.
+- **28 Python host checks passed**: actual SQLite queries/migrations and release credential setup in
+  temporary repositories, including injection rejection and bounded radio inventory/address persistence.
+- Debug and release APK assembly, release Kotlin compilation, SQLDelight migration verification and
+  data-vehicle instrumentation-test compilation passed. The credential-free release APK is unsigned and
+  not debuggable (verified with apksigner/aapt2), so no debug signing fallback remains. The merged phone
+  manifest targets API 37 and disables cleartext.
+- Detekt passes for data vehicle, main, background, Android Auto and phone. The former 13 main-module
+  magic-number findings were replaced with named colour/time constants; no baseline or rule was relaxed.
+- Phone Android lint: **0 errors, 19 existing icon/resource warnings**. Workflow actionlint, YAML parsing,
+  Bash syntax, local documentation links and `git diff --check` pass.
+- GitHub release tasks were tested without live credentials or publishing. The 68 directly versioned
+  Maven library entries returned no matches from OSV; this excludes transitive/BOM-selected dependencies.
+
+Reproduce the main checks (an Android SDK is required for Gradle's Android tasks):
+
+```bash
+python3 -m unittest discover -s tools -p 'test_*.py'
+./gradlew -p buildSrc test
+./gradlew :core:common:testDebugUnitTest :data:vehicle:testDebugUnitTest \
+  :feature:main:testDebugUnitTest :feature:background:testDebugUnitTest \
+  :feature:qrcode:testDebugUnitTest :feature:unlocated:testDebugUnitTest \
+  :feature:android-auto:testDebugUnitTest :app:phone:testDebugUnitTest \
+  :app:phone:assembleDebug :app:phone:assembleRelease :app:phone:compileReleaseKotlin \
+  :data:vehicle:verifySqlDelightMigration :data:vehicle:compileDebugAndroidTestKotlin
+./gradlew :app:phone:lintDebug :data:vehicle:detekt :feature:main:detekt \
+  :feature:background:detekt :feature:android-auto:detekt :app:phone:detekt
+```
+
+The release-script host tests need Git and jq. Build scans now require an explicit `--scan`.
+An initial run exposed the old resource-reporter filename limit and automatically published a scan
+under the previous settings. The corrected final runs pass without uploading scans. Reports and final
+logs are retained locally under the ignored `build/security-review/` directory.
+
+Device/emulator checks remain pending; this host has no accessible KVM or connected test device:
+
+1. Run `:data:vehicle:pixel2api34DebugAndroidTest`. New cases check stale unassignment, repeated swaps,
+   concurrent deletion and preservation of wheel identity when upgrading a schema-3 database.
+2. In two app entry points, race deletion/selection and spare-wheel display. One current vehicle must
+   remain usable, and the spare must keep one monitoring state. Open Unassign, replace the binding
+   elsewhere, then confirm the old dialog: it must reject the stale operation.
+3. Double-tap the front/rear shortcut: only one swap occurs inside five seconds. Assignments and the
+   last-swap timestamp must survive restart together.
+4. Test backup export/restore from multiple activities, screen disposal after confirmation, and process
+   interruption. The safety copy must remain readable; committed settings must recover on startup.
+   Fresh installs must have different default vehicle IDs; upgrades must retain existing IDs/NFC links.
+5. Connect a normal Android Auto host to a release build and a development host to Debug. An untrusted
+   host must fail release validation. Verify notification/foreground-service behavior with target API 37.
+6. Flood discovery with synthetic IDs/addresses while monitoring known sensors. New automatic inventory
+   admission stops at 256 total entries, identity tracking stays at 1,000, and known/manual sensors keep
+   updating. Verify bounded memory, freshness/missing warnings and recovery after the burst.
+
+These checks do not authenticate BLE senders. Real radio, OEM lifecycle and audible-delivery tests are
+still needed. No production installation or live release workflow was executed during this review.
+
+---
+
 # Combined feature-batch testing
 
 ## Features 52, 53, 55, 57–59 — sensor library and fleet debug checkpoint

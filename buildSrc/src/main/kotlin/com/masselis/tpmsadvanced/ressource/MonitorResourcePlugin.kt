@@ -21,16 +21,11 @@ public abstract class MonitorResourcePlugin : Plugin<Project> {
             .registerIfAbsent(
                 "monitor-resource-service", MonitorResourceService::class
             ) {
-                parameters.outputCsv = gradle
-                    .startParameter
-                    .taskNames
-                    .joinToString("_")
-                    .replace("[^a-zA-Z0-9.\\-]".toRegex(), "_")
+                parameters.outputCsv = resourceReportName(gradle.startParameter.taskNames)
                     .let { layout.buildDirectory.file("reports/resources/$it.csv") }
                 parameters.graphName = gradle
                     .startParameter
-                    .taskRequests
-                    .flatMap { it.args }
+                    .taskNames
                     .joinToString(" ")
                 parameters.maxGraphPoints = 12
             }

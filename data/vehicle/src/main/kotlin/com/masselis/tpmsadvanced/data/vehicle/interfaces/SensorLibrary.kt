@@ -72,7 +72,10 @@ public class SensorLibrary(private val database: Database, private val rideTools
             val warning = problems.distinct().takeIf { it.isNotEmpty() }?.joinToString("; ")
             if (reading != null) {
                 val id = reading.sensorId.toLong()
-                queries.ensureSensor(id)
+                // Radio identities are untrusted: a changing ID must not fill storage or break backups.
+                // Explicit assignments/manual spares still enter through ensureSensor and remain observable.
+                queries.ensureObservedSensor(id, MAX_OBSERVED_SENSORS)
+                if (queries.sensor(id).executeAsOneOrNull() == null) return@transaction
                 val tyre = reading as? Tyre
                 val volts = (tyre?.sensorBattery as? SensorBattery.Voltage)?.volts?.toDouble()
                     ?.takeIf { it.isFinite() && it in 0.0..5.0 }
@@ -89,6 +92,7 @@ public class SensorLibrary(private val database: Database, private val rideTools
                     percent?.toDouble() ?: 0.0, if (percent != null) 1 else 0, gap.seconds, gap.missed,
                     gap.seconds, if (warning != null) 1 else 0)
                 queries.rememberIdentity(packet.address, id)
+                queries.trimRadioIdentities()
             } else if (warning != null && identity != null) queries.markWarning(warning, packet.timestamp, identity)
             if (warning != null) {
                 queries.issue("${packet.address}:$identity:$warning", identity, packet.address, warning,
@@ -97,4 +101,6 @@ public class SensorLibrary(private val database: Database, private val rideTools
             }
         }
     } }
+
+    private companion object { const val MAX_OBSERVED_SENSORS = 256L }
 }

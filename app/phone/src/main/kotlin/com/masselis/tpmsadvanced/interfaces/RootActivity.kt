@@ -59,11 +59,15 @@ public class RootActivity : AppCompatActivity() {
     private fun selectVehicle(intent: Intent?) {
         vehicleLinkId(intent?.dataString)?.let { id -> lifecycleScope.launch {
             val database = (appGraph as VehicleToolsDependencies).toolsVehicles
-            val exists = withContext(Dispatchers.IO) { database.selectAll().execute().any { it.uuid == id } }
-            if (exists) {
-                RideRuntime.manualSelection.value = true
-                RideRuntime.selectionMutex.withLock { database.setIsCurrent(id, true) }
-            } else android.widget.Toast.makeText(this@RootActivity,
+            val selected = RideRuntime.selectionMutex.withLock {
+                val exists = withContext(Dispatchers.IO) { database.selectAll().execute().any { it.uuid == id } }
+                if (exists) {
+                    RideRuntime.manualSelection.value = true
+                    database.setIsCurrent(id, true)
+                }
+                exists
+            }
+            if (selected.not()) android.widget.Toast.makeText(this@RootActivity,
                 "This vehicle is not in TyrePing. Restore its backup first.",
                 android.widget.Toast.LENGTH_LONG).show()
         } }

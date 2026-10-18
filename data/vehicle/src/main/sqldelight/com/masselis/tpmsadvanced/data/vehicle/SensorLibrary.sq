@@ -89,6 +89,10 @@ SELECT * FROM SensorInventory WHERE id = ?;
 ensureSensor:
 INSERT OR IGNORE INTO SensorInventory(id) VALUES (?);
 
+ensureObservedSensor:
+INSERT OR IGNORE INTO SensorInventory(id)
+SELECT ? WHERE (SELECT COUNT(*) FROM SensorInventory) < ?;
+
 saveMetadata:
 UPDATE SensorInventory SET label = ?, manufacturer = ?, notes = ? WHERE id = ?;
 
@@ -106,6 +110,11 @@ SELECT sensorId FROM SensorRadioIdentity WHERE address = ?;
 rememberIdentity:
 INSERT INTO SensorRadioIdentity(address, sensorId) VALUES (?, ?)
 ON CONFLICT(address) DO UPDATE SET sensorId = excluded.sensorId;
+
+trimRadioIdentities:
+DELETE FROM SensorRadioIdentity WHERE rowid NOT IN (
+    SELECT rowid FROM SensorRadioIdentity ORDER BY rowid DESC LIMIT 1000
+);
 
 installations:
 SELECT * FROM SensorInstallation WHERE sensorId = ? ORDER BY started DESC, id DESC LIMIT 200;

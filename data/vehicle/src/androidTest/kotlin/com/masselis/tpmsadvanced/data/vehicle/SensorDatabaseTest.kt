@@ -57,6 +57,29 @@ internal class SensorDatabaseTest {
         assertEquals(count, sensorQueries.countByVehicle(vehicleUuid).executeAsOne())
 
     @Test
+    fun repeatedSwapCannotUndoTheFirstSwapDuringCooldown() = runTest {
+        Location.Wheel.entries.forEachIndexed { index, wheel ->
+            sensorDatabase.upsert(Sensor(index + 1, wheel), currentVehicleUuid)
+        }
+        val time = kotlin.time.Clock.System.now()
+        assertEquals(true, sensorDatabase.swapFrontRear(currentVehicleUuid, time))
+        assertEquals(false, sensorDatabase.swapFrontRear(currentVehicleUuid, time))
+        assertSensorId(3, currentVehicleUuid, FRONT_LEFT)
+        assertSensorId(4, currentVehicleUuid, FRONT_RIGHT)
+    }
+
+    @Test
+    fun staleUnassignDoesNotRemoveReplacement() = runTest {
+        val reviewed = Sensor(1, FRONT_LEFT)
+        sensorDatabase.upsert(reviewed, currentVehicleUuid)
+        sensorDatabase.upsert(Sensor(2, FRONT_LEFT), currentVehicleUuid)
+        assertFailsWith<IllegalArgumentException> {
+            sensorDatabase.unbindIfCurrent(currentVehicleUuid, reviewed)
+        }
+        assertSensorId(2, currentVehicleUuid, FRONT_LEFT)
+    }
+
+    @Test
     fun simpleInsert() = runTest {
         assertSensorCount(0, currentVehicleUuid)
         sensorDatabase.upsert(Sensor(1, FRONT_LEFT), currentVehicleUuid)

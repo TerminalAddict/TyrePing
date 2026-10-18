@@ -33,9 +33,11 @@ public class CurrentVehicleUseCase internal constructor(
 ) : StateFlow<VehicleComponent> by stateFlow {
 
     public suspend fun setAsCurrent(uuid: UUID) {
-        if (database.selectAll().execute().none { it.uuid == uuid }) return
-        RideRuntime.manualSelection.value = true
-        RideRuntime.selectionMutex.withLock { database.setIsCurrent(uuid, true) }
+        RideRuntime.selectionMutex.withLock {
+            if (database.selectAll().execute().none { it.uuid == uuid }) return
+            RideRuntime.manualSelection.value = true
+            database.setIsCurrent(uuid, true)
+        }
     }
 
     public suspend fun setAsCurrent(vehicle: Vehicle): Unit = setAsCurrent(vehicle.uuid)

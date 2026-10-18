@@ -13,6 +13,7 @@ import com.masselis.tpmsadvanced.data.vehicle.model.moveSensors
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import kotlin.time.Duration.Companion.seconds
 
 @Suppress("TooManyFunctions") // Typed operations for this database table.
 public class SensorDatabase internal constructor(
@@ -98,13 +99,26 @@ public class SensorDatabase internal constructor(
             }
         }
 
-    public suspend fun deleteFromVehicleAndUpsert(
-        sensors: List<Sensor>,
-        vehicleId: UUID
-    ): Unit = withContext(IO) {
-        database.transaction {
+    /** One transaction covers the eligibility check, assignments and cooldown timestamp. */
+    public suspend fun swapFrontRear(vehicleId: UUID, time: kotlin.time.Instant): Boolean = withContext(IO) {
+        database.transactionWithResult {
+            val vehicle = vehicleQueries.selectByUuid(vehicleId).executeAsOneOrNull()
+                ?: return@transactionWithResult false
+            val current = queries.selectListByVehicleId(vehicleId, mapper).executeAsList()
+            val moves = mapOf<Location, Location>(
+                Location.Wheel.FRONT_LEFT to Location.Wheel.REAR_LEFT,
+                Location.Wheel.REAR_LEFT to Location.Wheel.FRONT_LEFT,
+                Location.Wheel.FRONT_RIGHT to Location.Wheel.REAR_RIGHT,
+                Location.Wheel.REAR_RIGHT to Location.Wheel.FRONT_RIGHT)
+            if (vehicle.kind != com.masselis.tpmsadvanced.data.vehicle.model.Vehicle.Kind.CAR ||
+                current.map { it.location }.toSet() != moves.keys ||
+                vehicle.lastFrontRearTyreSwap?.let { time - it < SWAP_COOLDOWN } == true)
+                return@transactionWithResult false
+            val updated = moveSensors(current, vehicle.kind.locations, moves)
             queries.deleteByVehicle(vehicleId)
-            sensors.forEach { upsertSync(it, vehicleId) }
+            updated.forEach { upsertSync(it, vehicleId) }
+            vehicleQueries.updateLastFrontRearTyreSwap(time, vehicleId)
+            true
         }
     }
 
@@ -132,6 +146,8 @@ public class SensorDatabase internal constructor(
         .asList()
 
     private companion object {
+        private val SWAP_COOLDOWN = 5.seconds
+
         private val mapper: (
             id: Int,
             location: Location,

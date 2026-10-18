@@ -7,6 +7,8 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.runBlocking
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.services.BuildService
@@ -74,7 +76,7 @@ internal abstract class MonitorResourceService :
     }
 
     override fun close() {
-        job.cancel()
+        runBlocking { job.cancelAndJoin() }
         csvFile
             // A clean task can remove the optional report while this service is running.
             .takeIf { it.isFile }

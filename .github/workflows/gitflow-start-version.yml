@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ${{ inputs.flow == 'release' && 'develop' || 'main' }}
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           ref: ${{ inputs.flow == 'release' && 'develop' || 'main' }}
@@ -55,26 +55,12 @@ jobs:
 
       - name: Use the release PAT for pushes
         shell: bash
-        # actions/checkout authenticates with the ephemeral GITHUB_TOKEN, which does NOT trigger
-        # other workflows when it pushes - so pushing the new branch would silently never run
-        # beta.yml/hotfix.yml. Re-point the remote at the real PAT (same one GithubPlugin already
-        # uses) before the push happens.
-        #
-        # persist-credentials: false above means checkout never configures a GITHUB_TOKEN
-        # credential in the first place.
-        run: |
-          token=$(jq -r .GITHUB_TOKEN secrets/keys.json)
-          git remote set-url origin "https://x-access-token:${token}@github.com/VincentMasselis/TPMS-advanced.git"
-          identity=$(curl -sf -H "Authorization: token ${token}" https://api.github.com/user)
-          login=$(echo "$identity" | jq -r .login)
-          id=$(echo "$identity" | jq -r .id)
-          git config user.name "$login"
-          git config user.email "${id}+${login}@users.noreply.github.com"
+        run: bash .github/scripts/configure-release-git.sh
 
       - name: Bump the version
         shell: bash
         env:
-          BUMP: ${{ inputs.bump }}
+          BUMP: ${{ inputs.flow == 'hotfix' && 'patch' || inputs.bump }}
         run: |
           ./gradlew bumpVersion -Pversion.bump="$BUMP" --stacktrace
 

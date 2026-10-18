@@ -40,8 +40,13 @@ internal abstract class FetchSession : ValueSource<Optional<String>, Parameters>
                     writeText(pwd)
                 }
             }
-        if (server == null || email == null || passwordFile == null) Optional.empty()
-        else Optional.of(execOperations.bwSession(server, email, passwordFile))
+        try {
+            if (server == null || email == null || passwordFile == null) Optional.empty()
+            else Optional.of(execOperations.bwSession(server, email, passwordFile))
+        } finally {
+            // A Gradle daemon can outlive the build for hours; deleteOnExit alone retains the master password.
+            passwordFile?.delete()
+        }
     }
 
     private fun ExecOperations.bwSession(

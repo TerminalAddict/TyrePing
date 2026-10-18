@@ -48,7 +48,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 
 @SuppressLint("MissingPermission")
@@ -99,11 +98,12 @@ internal class BluetoothLeScannerImpl(
     private fun scan(scanFilters: List<ScanFilter>?) = callbackFlow<ScanEvent<ScanResult>> {
         val callback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
-                launch { send(ScanEvent.Reading(result)) }
+                // Do not launch a suspended coroutine per packet when storage/consumers are slow.
+                trySend(ScanEvent.Reading(result))
             }
 
             override fun onBatchScanResults(results: MutableList<ScanResult>) {
-                launch { results.forEach { send(ScanEvent.Reading(it)) } }
+                results.forEach { trySend(ScanEvent.Reading(it)) }
             }
 
             override fun onScanFailed(errorCode: Int) {
@@ -141,7 +141,8 @@ internal class BluetoothLeScannerImpl(
                 logger.w("Bluetooth permission revoked before scan cleanup", cause)
             }
         }
-    }.flowOn(Dispatchers.Main) // System's BluetoothLeScanner class as issues if called on a background thread
+    }.buffer(SCAN_QUEUE_CAPACITY)
+        .flowOn(Dispatchers.Main) // Android's scanner must be started/stopped on the main thread.
         .recoveringScan(bluetoothEnabled) { next ->
             status.value = next
             SensorReception.status(next)
@@ -206,6 +207,7 @@ internal class BluetoothLeScannerImpl(
     override val isBluetoothRequired = true
 
     companion object {
+        private const val SCAN_QUEUE_CAPACITY = 256
         private val SERVICES = listOf(
             RawSysgration.SERVICE_UUID,
             RawPecham.SERVICE_UUID,

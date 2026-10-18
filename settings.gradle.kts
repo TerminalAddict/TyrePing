@@ -28,6 +28,8 @@ dependencyResolutionManagement {
 
 develocity {
     buildScan {
+        val publishBuildScan = gradle.startParameter.isBuildScan
+        publishing.onlyIf { publishBuildScan }
         termsOfUseUrl = "https://gradle.com/help/legal-terms-of-use"
         termsOfUseAgree = "yes"
     }

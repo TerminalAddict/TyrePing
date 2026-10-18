@@ -84,10 +84,9 @@ public interface VehicleBindings {
     @Provides
     private fun deleteVehicleUseCase(
         vehicle: Vehicle,
-        currentVehicleUseCase: CurrentVehicleUseCase,
         database: VehicleDatabase,
         @VehicleLifecycle scope: CoroutineScope,
-    ): DeleteVehicleUseCase = DeleteVehicleUseCase(vehicle, currentVehicleUseCase, database, scope)
+    ): DeleteVehicleUseCase = DeleteVehicleUseCase(vehicle, database, scope)
 
     @Provides
     private fun clearBoundSensorsUseCase(

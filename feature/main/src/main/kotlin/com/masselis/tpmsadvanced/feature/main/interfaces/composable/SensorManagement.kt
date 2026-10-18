@@ -110,7 +110,7 @@ internal fun SensorManagementDialog(vehicle: Vehicle, location: Location, dismis
                     TextButton(onClick = { gauge = true; scanning = false }) { Text("Compare with pressure gauge") }
                     TextButton(onClick = { calibrate = true }) { Text("Calibrate sensor") }
                     TextButton(onClick = { confirm("Remove sensor ${sensor.id.toUInt()} from this wheel?") {
-                        tools.toolsSensors.unbind(vehicle.uuid, location)
+                        tools.toolsSensors.unbindIfCurrent(vehicle.uuid, sensor)
                     } }) { Text("Unassign sensor") }
                     Text("Move / swap with:")
                     vehicle.kind.locations.filter { it != location }.forEach { destination ->

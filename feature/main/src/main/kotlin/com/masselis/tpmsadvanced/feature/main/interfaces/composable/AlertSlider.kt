@@ -33,7 +33,8 @@ import com.masselis.tpmsadvanced.data.vehicle.model.Temperature.CREATOR.fahrenhe
 import com.masselis.tpmsadvanced.feature.main.R
 import kotlin.math.roundToInt
 
-private val TyrePingBlue = Color(0xFF168BFF)
+private const val TYREPING_BLUE_ARGB = 0xFF168BFF
+private val TyrePingBlue = Color(TYREPING_BLUE_ARGB)
 
 @Composable
 internal fun PressureRangeSlider(

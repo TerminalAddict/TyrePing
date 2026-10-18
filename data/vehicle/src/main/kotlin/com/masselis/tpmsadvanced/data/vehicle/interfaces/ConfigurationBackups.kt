@@ -16,6 +16,9 @@ import com.masselis.tpmsadvanced.data.vehicle.model.Vehicle
 import com.masselis.tpmsadvanced.data.vehicle.model.backupLocation
 import com.masselis.tpmsadvanced.data.vehicle.model.mergeRideTools
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
@@ -23,7 +26,9 @@ import java.util.UUID
 public class ConfigurationBackups internal constructor(private val database: Database, private val context: Context) {
     private fun preferences(name: String): SharedPreferences = context.getSharedPreferences(name, Context.MODE_PRIVATE)
 
-    public suspend fun create(): ConfigurationBackup = withContext(Dispatchers.IO) { snapshot() }
+    public suspend fun create(): ConfigurationBackup = withContext(Dispatchers.IO) {
+        operationMutex.withLock { snapshot() }
+    }
 
     @Suppress("MagicNumber") // Must match the persisted preferences defaults.
     private fun snapshot(): ConfigurationBackup {
@@ -78,46 +83,54 @@ public class ConfigurationBackups internal constructor(private val database: Dat
 
     /** Merges vehicles by UUID, replaces their bindings and preserves history and unrelated vehicles. */
     public suspend fun restore(backup: ConfigurationBackup): Unit = withContext(Dispatchers.IO) {
-        backup.validate()
-        // Reject conflicts with retained vehicles before committing the database/restore journal.
-        mergeRideTools(RideToolsStore(context).read(), backup.settings.rideTools, backup.vehicles.map { it.uuid })
-        val previous = snapshot()
-        val recoveryFile = File(context.filesDir, "configuration-before-restore.json")
-        val safetyCopy = AtomicFile(recoveryFile)
-        val stream = safetyCopy.startWrite()
-        try {
-            stream.write(previous.encode().toByteArray(Charsets.UTF_8))
-            safetyCopy.finishWrite(stream)
-        } catch (failure: java.io.IOException) {
-            safetyCopy.failWrite(stream)
-            throw failure
-        }
-        database.transaction {
-                backup.sensorLibrary.forEach {
-                    database.sensorLibraryQueries.ensureSensor(it.id.toLong())
-                    database.sensorLibraryQueries.saveMetadata(it.label, it.manufacturer, it.notes, it.id.toLong())
+        operationMutex.withLock {
+            // Once started, finish the journal even if the settings screen is disposed.
+            withContext(NonCancellable) {
+                backup.validate()
+                // Reject conflicts with retained vehicles before committing the database/restore journal.
+                mergeRideTools(RideToolsStore(context).read(), backup.settings.rideTools, backup.vehicles.map { it.uuid })
+                val previous = snapshot()
+                val recoveryFile = File(context.filesDir, "configuration-before-restore.json")
+                val safetyCopy = AtomicFile(recoveryFile)
+                val stream = safetyCopy.startWrite()
+                try {
+                    stream.write(previous.encode().toByteArray(Charsets.UTF_8))
+                    safetyCopy.finishWrite(stream)
+                } catch (failure: java.io.IOException) {
+                    safetyCopy.failWrite(stream)
+                    throw failure
                 }
-                backup.vehicles.forEach { vehicle ->
-                    database.vehicleQueries.restoreConfiguration(UUID.fromString(vehicle.uuid),
-                        Vehicle.Kind.valueOf(vehicle.kind),
-                        vehicle.name, vehicle.current, Pressure(vehicle.lowPressure), Pressure(vehicle.highPressure),
-                        vehicle.separateRear, Pressure(vehicle.rearLow), Pressure(vehicle.rearHigh),
-                        Temperature(vehicle.lowTemp), Temperature(vehicle.normalTemp), Temperature(vehicle.highTemp))
+                database.transaction {
+                    backup.sensorLibrary.forEach {
+                        database.sensorLibraryQueries.ensureSensor(it.id.toLong())
+                        database.sensorLibraryQueries.saveMetadata(it.label, it.manufacturer, it.notes, it.id.toLong())
+                    }
+                    backup.vehicles.forEach { vehicle ->
+                        database.vehicleQueries.restoreConfiguration(UUID.fromString(vehicle.uuid),
+                            Vehicle.Kind.valueOf(vehicle.kind),
+                            vehicle.name, vehicle.current, Pressure(vehicle.lowPressure), Pressure(vehicle.highPressure),
+                            vehicle.separateRear, Pressure(vehicle.rearLow), Pressure(vehicle.rearHigh),
+                            Temperature(vehicle.lowTemp), Temperature(vehicle.normalTemp), Temperature(vehicle.highTemp))
+                    }
+                    backup.vehicles.forEach { database.sensorQueries.deleteByVehicle(UUID.fromString(it.uuid)) }
+                    backup.vehicles.forEach { vehicle -> vehicle.sensors.forEach {
+                        database.sensorQueries.upsert(it.id, backupLocation(it.location), UUID.fromString(vehicle.uuid))
+                    } }
+                    // The settings journal commits atomically with bindings. A process kill cannot lose the next step.
+                    database.configurationRestoreQueries.stage(backup.encode())
+                    val current = backup.vehicles.single { it.current }
+                    database.vehicleQueries.setAsFavourite(true, UUID.fromString(current.uuid))
                 }
-                backup.vehicles.forEach { database.sensorQueries.deleteByVehicle(UUID.fromString(it.uuid)) }
-                backup.vehicles.forEach { vehicle -> vehicle.sensors.forEach {
-                    database.sensorQueries.upsert(it.id, backupLocation(it.location), UUID.fromString(vehicle.uuid))
-                } }
-                // The settings journal commits atomically with bindings. A process kill cannot lose the next step.
-                database.configurationRestoreQueries.stage(backup.encode())
-                val current = backup.vehicles.single { it.current }
-                database.vehicleQueries.setAsFavourite(true, UUID.fromString(current.uuid))
+                finishPending(database, context)
+            }
         }
-        finishPending(database, context)
     }
 
     public suspend fun previousBackup(): String = withContext(Dispatchers.IO) {
-        File(context.filesDir, "configuration-before-restore.json").readText()
+        operationMutex.withLock {
+            AtomicFile(File(context.filesDir, "configuration-before-restore.json"))
+                .openRead().bufferedReader().use { it.readText() }
+        }
     }
 
     private fun edit(name: String, block: SharedPreferences.Editor.() -> Unit) {
@@ -158,6 +171,7 @@ public class ConfigurationBackups internal constructor(private val database: Dat
     }
 
     public companion object {
+        private val operationMutex = Mutex()
         /** Called before exposing the database on startup; idempotently finishes a committed restore. */
         public fun finishPending(database: Database, context: Context) {
             database.configurationRestoreQueries.pending().executeAsOneOrNull()?.let { payload ->

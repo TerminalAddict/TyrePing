@@ -19,6 +19,22 @@ class SensorLibrarySqlTest(unittest.TestCase):
     def tearDown(self):
         self.db.close()
 
+    def test_radio_discovery_is_bounded_and_manual_sensors_remain_available(self):
+        for sensor in range(1000, 1500):
+            self.db.execute(query("SensorLibrary", "ensureObservedSensor"), (sensor, 256))
+        self.assertEqual(256, self.db.execute("SELECT COUNT(*) FROM SensorInventory").fetchone()[0])
+        self.db.execute(query("SensorLibrary", "ensureSensor"), (2000,))
+        self.db.execute(query("SensorLibrary", "ensureObservedSensor"), (2000, 256))
+        self.assertIsNotNone(self.db.execute(query("SensorLibrary", "sensor"), (2000,)).fetchone())
+        self.assertEqual(257, self.db.execute("SELECT COUNT(*) FROM SensorInventory").fetchone()[0])
+
+    def test_changing_radio_addresses_cannot_grow_identity_cache_forever(self):
+        for index in range(1100):
+            self.db.execute(query("SensorLibrary", "rememberIdentity"), (f"address-{index}", -1))
+            self.db.execute(query("SensorLibrary", "trimRadioIdentities"))
+        self.assertEqual(1000, self.db.execute("SELECT COUNT(*) FROM SensorRadioIdentity").fetchone()[0])
+        self.assertEqual((-1,), self.db.execute(query("SensorLibrary", "radioIdentity"), ("address-1099",)).fetchone())
+
     def test_migration_retains_all_readings_and_backfills_assigned_and_unassigned_sensors(self):
         self.assertEqual(2, self.db.execute("SELECT COUNT(*) FROM Tyre").fetchone()[0])
         self.assertEqual([(-1, 100, 3.0, None), (2, 200, None, 90)], self.db.execute(

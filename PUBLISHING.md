@@ -1,3 +1,29 @@
+# Publishing TyrePing
+
+The current TyrePing distribution path is `tyreping-release.ps1` on the `tyreping` branch, described in
+[README.md](README.md). Its permanent package and signing-certificate checks are
+intentional trust anchors. Release builds without the signing files are unsigned, never debug-signed.
+
+The git-flow/Play Store automation below is retained for repositories configured with `develop`, `main`,
+release credentials and a Play listing. TyrePing is not currently published on Google Play. Merely
+building or testing the app does not publish anything.
+
+## Release tooling safeguards
+
+- Gradle publishing resolves the destination from `GITHUB_REPOSITORY` in CI, otherwise from
+  `github.repository` in `gradle.properties`. A local `-Pgithub.repository=owner/repo` overrides the file.
+  Repository values must be `owner/name`; the upstream repository is no longer embedded in tasks.
+- CI uses the release PAT through GitHub CLI's credential helper. It masks the token and exposes it to
+  subsequent job steps through the runner's environment file, without storing it in `.git/config`.
+  Run these secret-bearing jobs only for trusted release code.
+- GitHub API requests use HTTPS headers, bounded responses and timeouts, and reject redirects. HTTP
+  errors fail publication; explicitly handled 422 responses support existing back-merge branches/PRs.
+- Only the release APK is uploaded, named `TyrePing-<tag>.apk`. Debug APKs are excluded. The PowerShell
+  release script additionally verifies the permanent signer and produces `SHA256SUMS.txt`.
+- Workflow variables enter shell scripts through quoted environment variables. Actions are pinned to
+  resolved commit hashes, with their version tags retained as comments for dependency updates.
+- The Gradle wrapper checks its distribution SHA-256. Update the checksum along with the wrapper URL.
+
 ## Publish in beta
 
 Git-flow is enforced by the `gitflow` buildSrc plugin, backed by the `git` CLI. Every step below is
@@ -20,7 +46,7 @@ To create a release from `develop`, run:
 [CONTRIBUTING.md](CONTRIBUTING.md)); always available in CI.
 
 Alternatively, trigger the
-[Start a new version branch](https://github.com/VincentMasselis/TPMS-advanced/actions/workflows/gitflow-start-version.yml)
+[Start a new version branch](https://github.com/TerminalAddict/TyrePing/actions/workflows/gitflow-start-version.yml)
 workflow (`gh workflow run gitflow-start-version.yml -f flow=release -f bump=minor -f
 release-note="..."`) to do this from CI. Its `release-note` input is a single-line text box - use
 literal `\n` for line breaks (e.g. `- Fix A\n- Fix B`); the workflow unescapes it before writing
@@ -28,7 +54,7 @@ the file.
 
 If the version bump and release note are already committed to `develop` yourself, skip to
 `createRelease commitAddedFiles pushGitflowBranch`, or trigger
-[Cut a version branch](https://github.com/VincentMasselis/TPMS-advanced/actions/workflows/gitflow-cut-branch.yml)
+[Cut a version branch](https://github.com/TerminalAddict/TyrePing/actions/workflows/gitflow-cut-branch.yml)
 (`gh workflow run gitflow-cut-branch.yml -f flow=release`).
 
 - `assertReleaseBranchIsValid`: checks the release branch was actually cut from `develop` (not
@@ -44,9 +70,9 @@ variable in CI. Leave it `false` normally; set it to `true` after a Play Store r
 console then forces this flag until someone manually re-submits the app for review from the
 console.
 
-Hotfixes use the same workflows/tasks from `main` with `flow=hotfix` (pick `bump=patch` yourself -
-nothing enforces it), cutting `hotfix/<version>`. Pushing it triggers
-[hotfix.yml](https://github.com/VincentMasselis/TPMS-advanced/actions/workflows/hotfix.yml), which
+Hotfixes use the same workflows/tasks from `main` with `flow=hotfix` (the start-version workflow
+forces `patch`; use `-Pversion.bump=patch` when running tasks manually), cutting `hotfix/<version>`. Pushing it triggers
+[hotfix.yml](https://github.com/TerminalAddict/TyrePing/actions/workflows/hotfix.yml), which
 runs the buildSrc unit tests, `assertHotfixBranchIsValid`, `build`, `verifyPaparazzi` and the
 instrumented tests (`pixel2api34DebugAndroidTest`, `copyScreenshot`) - no beta publish or
 pre-release; a hotfix only reaches users once merged into `main`.
@@ -54,7 +80,7 @@ pre-release; a hotfix only reaches users once merged into `main`.
 ## Publish in production
 
 Pushing to `main` (via merging a `hotfix/*` or `release/*` branch) triggers
-[production.yml](https://github.com/VincentMasselis/TPMS-advanced/actions/workflows/production.yml):
+[production.yml](https://github.com/TerminalAddict/TyrePing/actions/workflows/production.yml):
 `assertVersionWasNotPushInProductionYet`, `createGithubRelease`,
 `publishToPlayStoreProductionRelease`, `updatePlayStoreScreenshotsRelease`,
 `openBackMergePullRequest`.

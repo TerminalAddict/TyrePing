@@ -87,7 +87,7 @@ A custom `GitflowPlugin` (git-cli backed, no JGit) derives the version from the 
 ./gradlew createRelease commitAddedFiles pushGitflowBranch -Pgitflow.gitflowBranchCommitMessage="Version bump"
 ```
 
-Hotfixes use `createHotfix` from `main` instead (pick `patch` yourself, it isn't enforced). The same steps run in CI via the `gitflow-start-version.yml` `workflow_dispatch` (bump + release note + cut), or `gitflow-cut-branch.yml` when the bump is already committed (cut only). A push to `main` also auto-opens a merge-commit back-merge PR into `develop`. See [PUBLISHING.md](PUBLISHING.md) for the full flow.
+Hotfixes use `createHotfix` from `main` instead (`patch` is forced by the start-version workflow; choose it explicitly for manual tasks). The same steps run in CI via the `gitflow-start-version.yml` `workflow_dispatch` (bump + release note + cut), or `gitflow-cut-branch.yml` when the bump is already committed (cut only). A push to `main` also auto-opens a merge-commit back-merge PR into `develop`. See [PUBLISHING.md](PUBLISHING.md) for the full flow.
 
 ## Code Style
 
@@ -123,3 +123,16 @@ Chaining is the default control flow in this codebase, not an occasional idiom. 
 - **Formatting**: 4-space indent, leading-dot chain wrapping (one call per line), fully-expanded imports (including importing enum constants directly so they can be used bare in `when`). Prefer `@Suppress` (`MaxLineLength`, `LongMethod`, etc.) over force-fragmenting cohesive logic to satisfy linters.
 - **Compose**: public composables take a trailing `modifier: Modifier = Modifier` and often a `viewModel: XViewModel = viewModel { ... }` default for testability. Split a public stateful composable from a private stateless one that takes the resolved state, to support previews with mock state. Colocate `@Preview` functions (one per state variant) in the same file.
 - **Tests**: JUnit4 + MockK + Turbine. `@Before fun setup()` plus a private `test()` factory built from fields set in `setup()`. Backtick natural-language names for scenario/behavior tests, camelCase for simple state-transition tests. Prefer `assertIs<State.X>(...)` over instanceof-style checks on sealed state.
+
+## Security review conventions
+
+Read `SECURITY_REVIEW.md` and the latest section in `TESTING.md` before changing reviewed boundaries.
+Release Android Auto hosts require validation; release signing never falls back to debug. GitHub release
+repository configuration is in `gradle.properties`/`GITHUB_REPOSITORY`, while update URLs and signer pins
+remain deliberate trust anchors. Backup operations share a mutex. Vehicle deletion and front/rear swapping
+perform their checks and writes in one SQL transaction; individual unassign confirmations verify sensor identity.
+Keep BLE callback work bounded and preserve the automatic inventory/address limits. Fresh database creation
+randomizes the fixture's default vehicle UUID; do not rewrite existing IDs or historical schema snapshots.
+
+Build scans require explicit `--scan`; avoid adding automatic upload on errors. Resource report labels
+must not include property values or credentials from command-line options.

@@ -1,6 +1,5 @@
 package com.masselis.tpmsadvanced.data.vehicle.interfaces
 
-import android.database.sqlite.SQLiteConstraintException
 import app.cash.sqldelight.ColumnAdapter
 import app.cash.sqldelight.db.AfterVersion
 import app.cash.sqldelight.db.QueryResult
@@ -22,91 +21,59 @@ import com.masselis.tpmsadvanced.data.vehicle.model.Vehicle.Kind.TADPOLE_THREE_W
 internal fun Database.Companion.afterVersion3(
     locationAdapter: ColumnAdapter<Location, Long>
 ) = AfterVersion(3) { driver ->
-    driver
-        .executeQuery(
-            null,
-            "SELECT location, vehicleId FROM Sensor",
-            {
-                val result = mutableListOf<Pair<SensorLocation, String>>()
-                while (it.next().value)
-                    result += Pair(
-                        SensorLocation.entries[it.getLong(0)!!.toInt()],
-                        it.getString(1)!!
-                    )
-                QueryResult.Value(result.toList())
-            },
-            0,
-        )
-        .value
-        .forEach { (sensorLocation, vehicleUuid) ->
-            driver
-                .executeQuery(
-                    identifier = null,
-                    sql = "SELECT kind FROM Vehicle WHERE Vehicle.uuid = ?",
-                    parameters = 1,
-                    binders = { bindString(0, vehicleUuid) },
-                    mapper = { cursor ->
-                        cursor.next()
-                        cursor.getString(0)!!
-                            .let { Vehicle.Kind.valueOf(it) }
-                            .let { QueryResult.Value(it) }
-                    },
-                )
-                .value
-                .let { kind ->
-                    when (kind) {
-                        CAR, DOUBLE_AXLE_TRAILER, Vehicle.Kind.CAR_WITH_SPARE, Vehicle.Kind.VAN,
-                        Vehicle.Kind.UTE -> sensorLocation.asWheelLocation()
-                        Vehicle.Kind.MONOWHEEL -> Location.Auxiliary.SINGLE
-
-                        SINGLE_AXLE_TRAILER -> when (sensorLocation) {
-                            FRONT_LEFT, REAR_LEFT -> Location.Side.LEFT
-                            FRONT_RIGHT, REAR_RIGHT -> Location.Side.RIGHT
-                        }
-
-                        MOTORCYCLE -> when (sensorLocation) {
-                            FRONT_LEFT, FRONT_RIGHT -> Location.Axle.FRONT
-                            REAR_LEFT, REAR_RIGHT -> Location.Axle.REAR
-                        }
-
-                        TADPOLE_THREE_WHEELER -> when (sensorLocation) {
-                            FRONT_LEFT, FRONT_RIGHT -> sensorLocation.asWheelLocation()
-                            REAR_LEFT, REAR_RIGHT -> Location.Axle.REAR
-                        }
-
-                        DELTA_THREE_WHEELER -> when (sensorLocation) {
-                            FRONT_LEFT, FRONT_RIGHT -> Location.Axle.FRONT
-                            REAR_LEFT, REAR_RIGHT -> sensorLocation.asWheelLocation()
-                        }
-                    }
+    // Read every vehicle, including those with history but no currently assigned sensors.
+    val vehicles = driver.executeQuery(null, "SELECT uuid, kind FROM Vehicle", { cursor ->
+        val rows = mutableListOf<Pair<String, Vehicle.Kind>>()
+        while (cursor.next().value) rows += checkNotNull(cursor.getString(0)) to
+            Vehicle.Kind.valueOf(checkNotNull(cursor.getString(1)))
+        QueryResult.Value(rows)
+    }, 0).value
+    vehicles.forEach { (vehicleUuid, kind) ->
+        val locations = SensorLocation.entries.map { old ->
+            when (kind) {
+                CAR, DOUBLE_AXLE_TRAILER, Vehicle.Kind.CAR_WITH_SPARE, Vehicle.Kind.VAN, Vehicle.Kind.UTE ->
+                    old.asWheelLocation()
+                Vehicle.Kind.MONOWHEEL -> Location.Auxiliary.SINGLE
+                SINGLE_AXLE_TRAILER -> when (old) {
+                    FRONT_LEFT, REAR_LEFT -> Location.Side.LEFT
+                    FRONT_RIGHT, REAR_RIGHT -> Location.Side.RIGHT
                 }
-                .let(locationAdapter::encode)
-                .let { encodedLocation ->
-                    try {
-                        driver.execute(
-                            null,
-                            "UPDATE Sensor SET location = ? WHERE vehicleId = ?",
-                            2
-                        ) {
-                            bindLong(0, encodedLocation)
-                            bindString(1, vehicleUuid)
-                        }
-                    } catch (_: SQLiteConstraintException) {
-                        // Appends if a vehicle like a motorcycle has 2 front wheels associated.
-                        // The new database schema version 4 doesn't accept this case so the first
-                        // sensor is set as the front wheel, the 2nd one is dropped from the
-                        // database.
-                    }
-                    driver.execute(
-                        null,
-                        "UPDATE Tyre SET location = ? WHERE vehicleId = ?",
-                        2
-                    ) {
-                        bindLong(0, encodedLocation)
-                        bindString(1, vehicleUuid)
-                    }
+                MOTORCYCLE -> when (old) {
+                    FRONT_LEFT, FRONT_RIGHT -> Location.Axle.FRONT
+                    REAR_LEFT, REAR_RIGHT -> Location.Axle.REAR
                 }
+                TADPOLE_THREE_WHEELER -> when (old) {
+                    FRONT_LEFT, FRONT_RIGHT -> old.asWheelLocation()
+                    REAR_LEFT, REAR_RIGHT -> Location.Axle.REAR
+                }
+                DELTA_THREE_WHEELER -> when (old) {
+                    FRONT_LEFT, FRONT_RIGHT -> Location.Axle.FRONT
+                    REAR_LEFT, REAR_RIGHT -> old.asWheelLocation()
+                }
+            }.let(locationAdapter::encode)
         }
+        val sensors = driver.executeQuery(null,
+            "SELECT id, location FROM Sensor WHERE vehicleId = ? ORDER BY location, id", { cursor ->
+                val rows = mutableListOf<Pair<Long, Int>>()
+                while (cursor.next().value) rows += checkNotNull(cursor.getLong(0)) to
+                    checkNotNull(cursor.getLong(1)).toInt()
+                QueryResult.Value(rows)
+            }, 1) { bindString(0, vehicleUuid) }.value
+        // Reinsert from a snapshot so old and new numeric location values cannot collide mid-conversion.
+        driver.execute(null, "DELETE FROM Sensor WHERE vehicleId = ?", 1) { bindString(0, vehicleUuid) }
+        sensors.forEach { (id, old) ->
+            // A motorcycle/trailer may collapse two old wheel positions into one. Keep the first assignment.
+            driver.execute(null, "INSERT OR IGNORE INTO Sensor(id, location, vehicleId) VALUES (?, ?, ?)", 3) {
+                bindLong(0, id); bindLong(1, locations[old]); bindString(2, vehicleUuid)
+            }
+        }
+        driver.execute(null,
+            "UPDATE Tyre SET location = CASE location WHEN 0 THEN ? WHEN 1 THEN ? WHEN 2 THEN ? " +
+                "WHEN 3 THEN ? ELSE location END WHERE vehicleId = ?", 5) {
+            locations.forEachIndexed { index, location -> bindLong(index, location) }
+            bindString(4, vehicleUuid)
+        }
+    }
 }
 
 // Copy/pasted from previous version of the code. The enum is kept here for database migration needs

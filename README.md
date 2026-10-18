@@ -107,7 +107,9 @@ observations and does not start another Bluetooth scanner. Existing vehicle diag
 individual dashboard.
 
 **Settings → Sensor inventory and health** lists assigned sensors and unassigned spares. Recognised
-BLE broadcasts add entries while scanning; add a labelled spare manually by decimal or hexadecimal
+BLE broadcasts add entries while scanning, up to 256 inventory entries from automatic discovery.
+After that, use **Add spare** or explicitly assign a discovered sensor; existing inventory entries keep
+updating. Radio address identity tracking retains at most 1,000 addresses. Add a labelled spare by decimal or hexadecimal
 ID. Record manufacturer and notes, review assignments, move a sensor to a wheel with confirmation,
 or return it to the spare library. Removal, replacement, rotation and vehicle deletion retain its
 inventory and installation snapshots. Existing assignments are recorded at upgrade with their earlier
@@ -407,7 +409,7 @@ are reported. Export or clear the saved capture from the same section. It is sep
 
 **Car with spare** provides five distinct positions; its spare needs an explicit sensor assignment.
 Four-sensor QR kits populate only its normal road wheels. **Monowheel** has one explicit sensor slot;
-multi-sensor kits are rejected. **Van** and **Ute** currently use the four-wheel car diagram and the
+multi-sensor kits are rejected. **Van** and **Ute** use their own vehicle diagrams and the
 same front/rear threshold controls. Car-with-spare and monowheel use labelled reading cards in portrait.
 The double axle trailer retains its existing schema image and four positions.
 
@@ -429,7 +431,9 @@ Import validates the format/version, vehicles, wheel compatibility, unique senso
 setting ranges before showing a confirmation. Matching vehicle IDs and their bindings are replaced;
 other vehicles and recorded history remain. Imported sensor IDs may move from another vehicle.
 Global settings change, and a safety copy is saved before any database changes. Vehicles and a
-settings recovery journal commit together so reopening can finish an interrupted restore.
+settings recovery journal commit together so reopening can finish an interrupted restore. Backup/export and
+restore operations are serialized, and a confirmed restore finishes even if its screen closes. New installations
+generate a unique default vehicle ID; existing IDs are retained so NFC tags and older backups still work.
 
 Confirming stops background monitoring and restarts TyrePing. Re-arm automatic watches yourself.
 **Export safety copy from last restore** retrieves the previous configuration if needed. Restore is
@@ -480,6 +484,9 @@ Linux/macOS:
 ```bash
 ./gradlew :app:phone:assembleDebug
 ```
+
+Debug builds require no signing secrets. A release build without release credentials produces an
+unsigned APK; it no longer falls back to the debug signing key. Use the release script for distribution.
 
 The debug APK is created at:
 
@@ -709,3 +716,27 @@ TyrePing retains the upstream project’s Apache License 2.0 licensing.
 See [LICENSE](LICENSE) for the full licence text.
 
 The TyrePing name, package identity, branding, and launcher artwork are specific to this fork. References to the upstream project do not imply endorsement by its original author.
+
+## Security and common questions
+
+See [the security review](SECURITY_REVIEW.md) for findings, fixes, validation and remaining limits,
+and [data handling](app/phone/src/main/play/PRIVACY.md) for storage, exports and optional services.
+
+**Why does an unassign confirmation ask me to review again?** Another screen changed that wheel's
+binding after the confirmation opened. Reopen the wheel manager and review the current sensor.
+Concurrent vehicle deletions retain one usable current vehicle. The front/rear shortcut applies its
+five-second cooldown in the same transaction as the swap, so a double tap cannot immediately undo it.
+
+**Why does a custom Android Auto host work with Debug but not the release app?** Release builds
+validate hosts against AndroidX's host rules and certificate allowlist. Use TyrePing Debug for Desktop
+Head Unit development. Supporting another production host requires reviewing its signing identity.
+
+**Can someone nearby spoof a sensor?** These supported BLE advertisement formats do not authenticate
+senders. IDs, addresses and packet checksums do not prove origin. Compare unexpected readings with a
+trusted gauge. Under an excessive packet burst, the app drops new packets when its 256-entry radio
+queue is full; freshness and missing-reading warnings still matter.
+
+**Are backups encrypted?** TyrePing's exported JSON, CSV and JSONL files are plain text. Choose a trusted
+storage destination and review identifiers before sharing. Android's system backup is separate from the
+manual configuration export. Older installations can share the original default vehicle UUID; importing
+one of those backups still replaces that matching vehicle, as shown in the restore confirmation.

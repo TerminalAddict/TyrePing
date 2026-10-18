@@ -281,13 +281,13 @@ internal fun elapsedLabel(
     currentTime: Double,
 ): String {
     val minutes = totalMinutesSince(timestamp, currentTime)
-    val hours = minutes / 60
+    val hours = minutes / MINUTES_PER_HOUR
 
     return when {
         minutes == 0L -> "<1 min"
-        minutes < 120L -> "$minutes min"
-        hours < 48L -> "$hours hours"
-        else -> "${hours / 24} days"
+        minutes < MINUTES_BEFORE_HOURS -> "$minutes min"
+        hours < HOURS_BEFORE_DAYS -> "$hours hours"
+        else -> "${hours / HOURS_PER_DAY} days"
     }
 }
 
@@ -295,7 +295,7 @@ private fun totalMinutesSince(
     timestamp: Double,
     currentTime: Double,
 ): Long =
-    ((currentTime - timestamp) / 60.0)
+    ((currentTime - timestamp) / SECONDS_PER_MINUTE)
         .toLong()
         .coerceAtLeast(0L)
 
@@ -308,23 +308,31 @@ internal fun nextElapsedTick(
     currentTime: Double,
 ): Duration {
     val minutes = totalMinutesSince(timestamp, currentTime)
-    val hours = minutes / 60
+    val hours = minutes / MINUTES_PER_HOUR
 
     val nextBoundarySeconds = when {
-        minutes < 120L ->
-            (minutes + 1) * 60L
+        minutes < MINUTES_BEFORE_HOURS ->
+            (minutes + 1) * SECONDS_PER_MINUTE
 
-        hours < 48L ->
-            (hours + 1) * 3600L
+        hours < HOURS_BEFORE_DAYS ->
+            (hours + 1) * SECONDS_PER_HOUR
 
         else ->
-            (hours / 24 + 1) * 86400L
+            (hours / HOURS_PER_DAY + 1) * SECONDS_PER_DAY
     }
 
     return (timestamp + nextBoundarySeconds - currentTime)
         .seconds
         .coerceAtLeast(1.seconds)
 }
+
+private const val MINUTES_PER_HOUR = 60L
+private const val HOURS_PER_DAY = 24L
+private const val SECONDS_PER_MINUTE = 60L
+private const val SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR
+private const val SECONDS_PER_DAY = SECONDS_PER_HOUR * HOURS_PER_DAY
+private const val MINUTES_BEFORE_HOURS = 120L
+private const val HOURS_BEFORE_DAYS = 48L
 
 @Preview
 @Composable

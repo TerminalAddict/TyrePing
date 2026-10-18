@@ -53,7 +53,11 @@ public class VehicleDatabase internal constructor(database: Database) {
     }
 
     public suspend fun setIsCurrent(uuid: UUID, isCurrent: Boolean): Unit = withContext(IO) {
-        queries.setAsFavourite(isCurrent, uuid)
+        queries.transaction {
+            // Deep links and automatic selection can arrive after deletion was prepared.
+            if (queries.selectByUuid(uuid).executeAsOneOrNull() != null)
+                queries.setAsFavourite(isCurrent, uuid)
+        }
     }
 
     public fun selectSeparateFrontRearPressure(vehicleId: UUID): Query<Boolean> = queries
@@ -135,8 +139,16 @@ public class VehicleDatabase internal constructor(database: Database) {
         queries.updateLastFrontRearTyreSwap(lastFrontRearTyreSwap, vehicleId)
     }
 
-    public suspend fun setIsDeleting(uuid: UUID): Unit = withContext(IO) {
-        queries.updateIsDeleting(true, uuid)
+    /** Select a surviving vehicle and mark deletion in the same transaction, including concurrent requests. */
+    public suspend fun prepareDeletion(uuid: UUID): Boolean = withContext(IO) {
+        queries.transactionWithResult {
+            val vehicles = queries.selectAll().executeAsList()
+            if (vehicles.none { it.uuid == uuid }) return@transactionWithResult false
+            val replacement = vehicles.firstOrNull { it.uuid != uuid } ?: return@transactionWithResult false
+            queries.setAsFavourite(true, replacement.uuid)
+            queries.updateIsDeleting(true, uuid)
+            true
+        }
     }
 
     public suspend fun delete(uuid: UUID): Unit = withContext(IO) {
