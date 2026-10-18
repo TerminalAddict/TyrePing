@@ -76,8 +76,10 @@ internal abstract class MonitorResourceService :
     override fun close() {
         job.cancel()
         csvFile
-            .readLines()
-            .takeIf { it.size > 1 }
+            // A clean task can remove the optional report while this service is running.
+            .takeIf { it.isFile }
+            ?.readLines()
+            ?.takeIf { it.size > 1 }
             ?.drop(1)
             ?.map { it.split(',') }
             ?.let {
