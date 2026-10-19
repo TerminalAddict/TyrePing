@@ -62,7 +62,7 @@ private fun UpdateChecker(close: () -> Unit) {
         }
         Text("Checks published releases on TerminalAddict/TyrePing. Downloads open in your browser; " +
             "installation is your choice. Pre-releases may still need phone testing.")
-        if (BuildConfig.DEBUG) Text("This is TyrePing Debug. GitHub APKs install/update signed TyrePing as a " +
+        Text("This is TyrePing Debug. GitHub APKs install/update signed TyrePing as a " +
             "separate app; they do not replace Debug. Use configuration backup/restore to transfer settings.")
         TextButton(enabled = !busy, onClick = { scope.launch {
             busy = true; latest = null

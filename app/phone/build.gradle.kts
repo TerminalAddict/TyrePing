@@ -68,8 +68,10 @@ android {
     buildTypes.getByName("debug") {
         applicationIdSuffix = ".debug"
         versionNameSuffix = "-debug"
+        buildConfigField("boolean", "ENABLE_GITHUB_UPDATER", "true")
     }
     buildTypes.getByName("release") {
+        buildConfigField("boolean", "ENABLE_GITHUB_UPDATER", "false")
         // Without release credentials, assemble an unsigned artifact. Never impersonate a release with a debug key.
         signingConfig = signingConfigs.findByName("release")
         isMinifyEnabled = true

@@ -39,7 +39,7 @@ internal fun About(
         }
         AboutLink("TyrePing website", "https://www.tyreping.com/", snackbarHostState)
         AboutLink("Licences", "https://www.tyreping.com/licenses/", snackbarHostState)
-        UpdateCheckerButton()
+        if (BuildConfig.ENABLE_GITHUB_UPDATER) UpdateCheckerButton()
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("About Paul Willard", style = MaterialTheme.typography.titleLarge)
             Text(

@@ -72,7 +72,7 @@ internal fun Settings(
     DiagnosticsSettings()
     Separator()
     BackupSettings()
-    UpdateCheckerButton()
+    if (BuildConfig.ENABLE_GITHUB_UPDATER) UpdateCheckerButton()
     Separator()
     Box(Modifier.fillMaxWidth()) {
         Text(

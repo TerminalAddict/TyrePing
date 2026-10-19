@@ -24,9 +24,11 @@ retained until removed through the storage/retention controls; retention default
 
 ## Network access and external services
 
-The update checker contacts GitHub's public Releases API when you press **Check now**. It does not
-send sensor readings or require a GitHub account token. GitHub receives the network request, including
-your IP address. Opening a release/APK, website or licence link uses your browser and that site's services.
+Only TyrePing Debug includes the GitHub update checker. It contacts GitHub's public Releases API when
+you press **Check now**, without sending sensor readings or requiring a GitHub account token. GitHub
+receives the network request, including your IP address. Release builds, including GitHub release APKs
+and Google Play bundles, contain no GitHub update checker. Opening a website or licence link (or a
+release/APK link in Debug) uses your browser and that site's services.
 
 The project supports optional Firebase Crashlytics. Release builds configured with a Firebase project
 enable crash reporting and send diagnostic logs through Crashlytics. Those logs may include sensor

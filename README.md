@@ -61,7 +61,7 @@ TyrePing builds on the core capabilities of TPMS Advanced:
 - Garage / Fleet overview with all vehicles, tyre conditions, freshness and outstanding warnings
 - Handbook tyre sizes and load-specific cold-pressure recommendations, compared with alert profiles
 - Visible questionable-reading diagnostics, including malformed packets and unexpected sensor-ID changes
-- Manual GitHub update checker with stable/pre-release channels, release notes and signed APK links
+- Debug-only GitHub update checker with stable/pre-release channels, release notes and signed APK links
 - Saved towing combinations with a combined vehicle/trailer dashboard and independent alert limits
 - Configurable left/right pressure imbalance warnings for matching tyres on each axle
 - Reception statistics with RSSI, packet counts and optional expected-broadcast estimates
@@ -135,11 +135,18 @@ zero pressure is valid. Unreadable/non-finite packets cannot become usable readi
 diagnostic evidence. Bindings never change automatically. The latest 200 issue groups can be viewed
 and exported as JSONL, with a bounded store of 1000 groups; exports include sensor identifiers.
 
-**About → Check for TyrePing updates** (also in Settings) contacts GitHub only when you press **Check now**.
+In **TyrePing Debug**, **About → Check for TyrePing updates** (also in Settings) contacts GitHub only
+when you press **Check now**.
 Choose stable releases or include pre-releases, read notes and open the matching signed APK in your
 browser. It does not install updates automatically. Signed TyrePing and Debug are separate apps.
 The checker uses the [GitHub Releases API](https://docs.github.com/en/rest/releases/releases#list-releases)
 and compares version numbers without suggesting a downgrade.
+
+Release builds contain no GitHub update checker, including signed APKs published as GitHub
+pre-releases. Google Play handles updates for Play installations; users who sideload a release APK
+can install subsequent releases manually. GitHub release APKs do not update the separate Debug app.
+The checker UI, network client and release parser live in Debug-only Android source sets;
+`BuildConfig.ENABLE_GITHUB_UPDATER` also gates its About and Settings entry points.
 
 ### Monitoring tools (features 41–49)
 

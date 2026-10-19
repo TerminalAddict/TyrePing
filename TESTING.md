@@ -1,3 +1,43 @@
+# Debug-only GitHub checker — 19 October 2026
+
+Prepared on `codex/debug-only-github-updater` for the v0.12.2 pre-release. The validation below used
+version 0.12.1 before the release version bump; signing identities are unchanged.
+Debug retains the manual checker in About and Settings. Release excludes its UI, network client and
+release parser through Android source sets; both shared entry points also check
+`BuildConfig.ENABLE_GITHUB_UPDATER`. This applies equally to GitHub release APKs and Play bundles.
+
+Validation completed:
+
+- **115 JVM tests passed** (data vehicle 113, phone 2), including the four release-parser tests moved
+  into `testDebug`. The data-vehicle tests were explicitly rerun after the move.
+- **Two new Android emulator tests passed** on managed API-34 Pixel 2. Both About and Settings open
+  the Debug checker with stable/pre-release controls and the initial manual-check prompt.
+  These tests do not contact GitHub or download an APK.
+- Debug APK, signed Release APK and signed Release AAB built successfully. Phone/data-vehicle Detekt
+  passed. Debug and Release lint each report **0 errors and 19 existing warnings**.
+- Generated flags are true for Debug and false for Release. The network client and release model
+  classes are absent from compiled Release output **before shrinking**.
+- Inspected all DEX files in both APKs and the AAB: updater client/model identifiers, UI labels and
+  the GitHub API endpoint are present in Debug and absent from both Release artifacts. All three
+  original About links remain present. No artifact requests APK installation permissions.
+- Both APK certificates match the existing debug/permanent release certificates. Release remains
+  non-debuggable. These checks did not publish or change existing release artifacts.
+
+Install the rebuilt Debug app while retaining its data:
+
+```powershell
+adb install -r "D:\TyrePing-Releases\debug\TyrePing-debug-only-updater.apk"
+```
+
+APK: 90,229,376 bytes; SHA-256
+`e983afe55c9830aef17324bc2962ba60676fc0db9b6c3ca45ea5673be09dae76`.
+Build/test logs, signature checks and artifact inspection results are in
+`D:\TyrePing-Releases\debug-updater-validation-2026-10-19\`.
+The Play bundle is `app/phone/build/outputs/bundle/release/phone-release.aab`.
+The updater still links to the separate signed TyrePing app; those APKs cannot update Debug in place.
+
+---
+
 # Windows regression rerun — 19 October 2026
 
 Reran security-review commit `43995865` on the local `D:\TyrePing` checkout. Follow-up fixes were
