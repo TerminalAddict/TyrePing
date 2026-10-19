@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted.Companion.Eagerly
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.plus
 
 @Suppress("UnnecessaryOptInAnnotation")
@@ -15,4 +16,4 @@ internal class VehicleStateFlowUseCase(
     vehicle: Vehicle,
     database: VehicleDatabase,
     scope: CoroutineScope,
-) : StateFlow<Vehicle> by database.selectByUuid(vehicle.uuid).asStateFlow(scope + IO, Eagerly)
+) : StateFlow<Vehicle> by database.observeByUuid(vehicle.uuid).stateIn(scope + IO, Eagerly, vehicle)

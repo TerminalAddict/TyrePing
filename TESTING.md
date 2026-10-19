@@ -1,7 +1,62 @@
-# Security review validation — 19 October 2026
+# Windows regression rerun — 19 October 2026
+
+Reran security-review commit `43995865` on the local `D:\TyrePing` checkout. Follow-up fixes were
+prepared on `codex/security-review-validation` for the v0.12.1 pre-release. The validation below
+used version 0.12.0 before the release version bump.
+
+The rerun exposed and corrected:
+
+- A vehicle-deletion race introduced by moving deletion preparation before scope cancellation.
+  `selectByUuid` hides a row as soon as `isDeleting` is set, but the existing state observer could
+  still require that row and throw. Vehicle observers now complete when the row disappears, with
+  the state flow retaining its last snapshot until disposal. Atomic replacement selection and the
+  concurrent-deletion protections remain intact. Handbook/profile dialogs use the same safe observer.
+- Three Detekt line-length failures in backup restore. Only line wrapping changed.
+- Two outdated phone-test assumptions that vehicle settings were immediately visible. Test helpers
+  now scroll to controls before visibility checks/actions. The unavailable trailer switch must be
+  absent, rather than merely outside the viewport. These helpers/layout predate the security review.
+
+**47 Android emulator tests passed** on the managed API-34 AOSP ATD Pixel 2: database 26, phone 6,
+QR-code 6 and Android Auto 9, with zero failures/errors/skips. Two new database cases exercise live
+updates followed by deletion and starting an observer after deletion preparation/physical removal.
+The phone flow covers vehicle creation/deletion, binding, pressure controls, deep links, orientation
+and light/dark screenshot capture. Screenshots still show the vehicle diagram and tyre readings.
+
+Other completed checks:
+
+- **325 JVM tests passed**, including 43 buildSrc tests; **28 Python checks passed** without skips.
+- Debug and signed release assembly, SQLDelight migration verification, and all five reviewed-module
+  Detekt tasks passed. Android lint has **0 errors and 19 existing icon/resource warnings**.
+- Both APK signatures match the existing debug/permanent release certificates. Version remains
+  0.12.0 / 1200000, minimum API 28, target API 37, with cleartext disabled. Release is not debuggable.
+- A clean isolated clone of `43995865`, with no signing files, also assembled successfully. Its release
+  APK is unsigned and not debuggable (apksigner/aapt2 verified); the real checkout's credentials were untouched.
+- Workflow actionlint, nine YAML files, Bash syntax, local documentation links and whitespace checks
+  passed. The repeated credential-pattern scan found no matches in 635 tracked text files. OSV again
+  returned no matches for the 68 directly versioned Maven libraries; transitive/BOM artifacts are excluded.
+
+Install the rebuilt **TyrePing Debug** app (preserves an existing Debug installation's data):
+
+```powershell
+adb install -r "D:\TyrePing-Releases\debug\TyrePing-security-review-debug.apk"
+```
+
+APK: 92,348,959 bytes; SHA-256
+`a0873ffa70b3f7b63479c0dcc5ad457e09f58faac7a90a84d280a34fb4f1f8ee`.
+The adjacent `.apk.sha256` records the checksum. Logs and copied Android test XML reports are in
+`D:\TyrePing-Releases\security-review-validation-2026-10-19\`. No build scans or live publishing tasks ran.
+
+Physical sensor reception, OEM background lifecycle, audible alert delivery, backup process-kill
+timing and real Android Auto host acceptance still need device checks. Emulator template tests do not
+prove head-unit behavior. The original review record below is historical; this rerun supersedes its
+statement that emulator tests were unavailable.
+
+---
+
+# Original security review validation — 19 October 2026
 
 See [SECURITY_REVIEW.md](SECURITY_REVIEW.md) for severity, affected boundaries, changes and remaining risks.
-The feature-batch records below are historical checkpoints; the results here describe the current tree.
+This section records the original review environment; the Windows rerun above is the latest checkpoint.
 
 Host validation completed:
 

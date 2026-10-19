@@ -2,7 +2,6 @@ package com.masselis.tpmsadvanced.feature.main.interfaces.composable
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -49,15 +48,15 @@ public class Settings(
     private val deleteVehicleDialogTest = DeleteVehicleDialog()
 
     public fun assertVehicleSettingsDisplayed() {
-        onNodeWithTag(containerTag).assertIsDisplayed()
+        onNodeWithTag(containerTag).performScrollTo().assertIsDisplayed()
     }
 
     public fun assertSeparateFrontRearSwitchIsDisplayed() {
-        separateFrontRearPressureSwitch.assertIsDisplayed()
+        separateFrontRearPressureSwitch.performScrollTo().assertIsDisplayed()
     }
 
     public fun assertSeparateFrontRearSwitchIsNotDisplayed() {
-        separateFrontRearPressureSwitch.assertIsNotDisplayed()
+        separateFrontRearPressureSwitch.assertDoesNotExist()
     }
 
     public fun assertSeparateFrontRearSwitchIsOn() {
@@ -69,7 +68,7 @@ public class Settings(
     }
 
     public fun tapOnSeparateFrontRearSwitch() {
-        separateFrontRearPressureSwitch.performClick()
+        separateFrontRearPressureSwitch.performScrollTo().performClick()
     }
 
     public fun deleteVehicle(instructions: Instructions<DeleteVehicleDialog>): ExitToken<Settings> {

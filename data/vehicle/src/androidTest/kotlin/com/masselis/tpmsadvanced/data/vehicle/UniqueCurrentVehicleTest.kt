@@ -1,9 +1,11 @@
 package com.masselis.tpmsadvanced.data.vehicle
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.cash.turbine.test
 import com.masselis.tpmsadvanced.core.common.appGraph
 import com.masselis.tpmsadvanced.core.database.QueryList.Companion.asList
 import com.masselis.tpmsadvanced.data.vehicle.model.Vehicle
+import com.masselis.tpmsadvanced.data.vehicle.model.Pressure
 import com.masselis.tpmsadvanced.data.vehicle.interfaces.VehicleDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -59,6 +61,31 @@ internal class UniqueCurrentVehicleTest {
         assertEquals(1, results.count { it })
         assertEquals(1, repository.selectAll().execute().size)
         assertEquals(repository.selectAll().execute().single().uuid, repository.currentVehicle().execute().uuid)
+    }
+
+    @Test
+    fun vehicleObserverCompletesWhenDeletionIsPrepared() = runTest {
+        val repository = VehicleDatabase(database)
+        val vehicle = repository.currentVehicle().execute()
+        repository.insert(UUID.randomUUID(), Vehicle.Kind.CAR, "Survivor", false)
+        repository.observeByUuid(vehicle.uuid).test {
+            assertEquals(vehicle, awaitItem())
+            repository.updateLowPressure(Pressure(175f), vehicle.uuid)
+            assertEquals(175f, awaitItem().lowPressure.kpa)
+            assertTrue(repository.prepareDeletion(vehicle.uuid))
+            awaitComplete()
+        }
+    }
+
+    @Test
+    fun vehicleObserverCanStartAfterDeletionWasPrepared() = runTest {
+        val repository = VehicleDatabase(database)
+        val vehicle = repository.currentVehicle().execute()
+        repository.insert(UUID.randomUUID(), Vehicle.Kind.CAR, "Survivor", false)
+        assertTrue(repository.prepareDeletion(vehicle.uuid))
+        repository.observeByUuid(vehicle.uuid).test { awaitComplete() }
+        repository.delete(vehicle.uuid)
+        repository.observeByUuid(vehicle.uuid).test { awaitComplete() }
     }
 
     @Test

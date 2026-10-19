@@ -43,7 +43,7 @@ private fun ManufacturerSpecifications(vehicle: Vehicle, close: () -> Unit) {
     val tools = remember { appGraph as VehicleToolsDependencies }
     val data by tools.rideTools.values.collectAsState()
     val unit by tools.toolsUnits.pressure.collectAsState()
-    val current by remember(vehicle.uuid) { tools.toolsVehicles.selectByUuid(vehicle.uuid).asFlow() }
+    val current by remember(vehicle.uuid) { tools.toolsVehicles.observeByUuid(vehicle.uuid) }
         .collectAsState(vehicle)
     val records = data.vehicles[vehicle.uuid.toString()]?.specifications.orEmpty()
     var edit by remember { mutableStateOf<TyreSpecification?>(null) }

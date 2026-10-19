@@ -88,7 +88,9 @@ public class ConfigurationBackups internal constructor(private val database: Dat
             withContext(NonCancellable) {
                 backup.validate()
                 // Reject conflicts with retained vehicles before committing the database/restore journal.
-                mergeRideTools(RideToolsStore(context).read(), backup.settings.rideTools, backup.vehicles.map { it.uuid })
+                mergeRideTools(
+                    RideToolsStore(context).read(), backup.settings.rideTools, backup.vehicles.map { it.uuid }
+                )
                 val previous = snapshot()
                 val recoveryFile = File(context.filesDir, "configuration-before-restore.json")
                 val safetyCopy = AtomicFile(recoveryFile)
@@ -108,9 +110,11 @@ public class ConfigurationBackups internal constructor(private val database: Dat
                     backup.vehicles.forEach { vehicle ->
                         database.vehicleQueries.restoreConfiguration(UUID.fromString(vehicle.uuid),
                             Vehicle.Kind.valueOf(vehicle.kind),
-                            vehicle.name, vehicle.current, Pressure(vehicle.lowPressure), Pressure(vehicle.highPressure),
+                            vehicle.name, vehicle.current,
+                            Pressure(vehicle.lowPressure), Pressure(vehicle.highPressure),
                             vehicle.separateRear, Pressure(vehicle.rearLow), Pressure(vehicle.rearHigh),
-                            Temperature(vehicle.lowTemp), Temperature(vehicle.normalTemp), Temperature(vehicle.highTemp))
+                            Temperature(vehicle.lowTemp), Temperature(vehicle.normalTemp),
+                            Temperature(vehicle.highTemp))
                     }
                     backup.vehicles.forEach { database.sensorQueries.deleteByVehicle(UUID.fromString(it.uuid)) }
                     backup.vehicles.forEach { vehicle -> vehicle.sensors.forEach {

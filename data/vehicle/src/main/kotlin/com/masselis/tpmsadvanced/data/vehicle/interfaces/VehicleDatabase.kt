@@ -13,7 +13,9 @@ import com.masselis.tpmsadvanced.data.vehicle.model.Temperature
 import com.masselis.tpmsadvanced.data.vehicle.model.Vehicle
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.withContext
 import java.util.UUID
 import kotlin.time.Instant
@@ -166,6 +168,14 @@ public class VehicleDatabase internal constructor(database: Database) {
     public fun selectByUuid(vehicleId: UUID): QueryOne<Vehicle> = queries
         .selectByUuid(vehicleId, mapper)
         .asOne()
+
+    /** Ends when deletion hides the row, before the vehicle's UI and coroutine scope are disposed. */
+    public fun observeByUuid(vehicleId: UUID): Flow<Vehicle> = queries
+        .selectByUuid(vehicleId, mapper)
+        .asOneOrNull()
+        .asFlow()
+        .takeWhile { it != null }
+        .filterNotNull()
 
     public fun selectBySensorId(sensorId: Int): QueryOneOrNull<Vehicle> = queries
         .selectBySensorId(sensorId, mapper)

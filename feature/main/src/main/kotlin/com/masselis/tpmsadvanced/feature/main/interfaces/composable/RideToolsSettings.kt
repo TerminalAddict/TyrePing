@@ -203,7 +203,7 @@ public fun RideToolsDialog(title: String, close: () -> Unit, content: @Composabl
 private fun PressureProfiles(vehicle: Vehicle, close: () -> Unit) {
     val deps = remember { appGraph as VehicleToolsDependencies }
     val data by deps.rideTools.values.collectAsState()
-    val current by remember(vehicle.uuid) { deps.toolsVehicles.selectByUuid(vehicle.uuid).asFlow() }
+    val current by remember(vehicle.uuid) { deps.toolsVehicles.observeByUuid(vehicle.uuid) }
         .collectAsState(vehicle)
     val tools = data.vehicles[vehicle.uuid.toString()] ?: VehicleRideTools()
     var editor by remember { mutableStateOf<PressureProfile?>(null) }
