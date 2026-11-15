@@ -380,97 +380,11 @@ private fun Motorcycle(
     snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier
 ) {
-    ConstraintLayout(modifier = modifier) {
-        val (
-            vehicleImage,
-            tyreBox,
-            tyreFront,
-            frontStats,
-            frontBinding,
-            tyreRear,
-            rearStats,
-            rearBinding,
-        ) = createRefs()
-        Image(
-            bitmap = ImageBitmap.imageResource(id = R.drawable.schema_motorcycle_top_view),
-            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onBackground),
-            contentDescription = "Image of your motorcycle",
-            modifier = Modifier
-                .aspectRatio(208f / 462f)
-                .constrainAs(vehicleImage) {
-                    centerTo(parent)
-                    height = Dimension.percent(.7f)
-                }
-        )
-        Box(
-            Modifier
-                .aspectRatio(235f / 462f)
-                .constrainAs(tyreBox) {
-                    centerHorizontallyTo(parent)
-                    centerVerticallyTo(parent, 0.4f)
-                    height = Dimension.percent(.65f)
-                }
-        )
-        with(Location.Axle.FRONT) {
-            Tyre(
-                location = this,
-                snackbarHostState = snackbarHostState,
-                modifier = Modifier
-                    .constrainAs(tyreFront) {
-                        start.linkTo(tyreBox.start)
-                        end.linkTo(tyreBox.end)
-                        top.linkTo(tyreBox.top)
-                        width = Dimension.value(30.dp)
-                        height = Dimension.value(100.dp)
-                    }
-            )
-            TyreStat(
-                location = this,
-                modifier = Modifier.constrainAs(frontStats) {
-                    centerHorizontallyTo(tyreFront)
-                    bottom.linkTo(vehicleImage.top, 8.dp)
-                }
-            )
-            BindSensorButton(
-                location = this,
-                modifier = Modifier.constrainAs(frontBinding) {
-                    top.linkTo(tyreFront.top)
-                    bottom.linkTo(tyreFront.bottom)
-                    end.linkTo(tyreFront.start)
-                }
-            )
-        }
-        with(Location.Axle.REAR) {
-            Tyre(
-                location = this,
-                snackbarHostState = snackbarHostState,
-                modifier = Modifier
-                    .constrainAs(tyreRear) {
-                        start.linkTo(tyreBox.start)
-                        end.linkTo(tyreBox.end)
-                        bottom.linkTo(tyreBox.bottom)
-                        width = Dimension.value(30.dp)
-                        height = Dimension.value(100.dp)
-                    }
-            )
-            TyreStat(
-                location = this,
-                modifier = Modifier.constrainAs(rearStats) {
-                    centerHorizontallyTo(tyreRear)
-                    top.linkTo(vehicleImage.bottom, 8.dp)
-                }
-            )
-            BindSensorButton(
-                location = this,
-                modifier = Modifier
-                    .constrainAs(rearBinding) {
-                        top.linkTo(tyreRear.top)
-                        bottom.linkTo(tyreRear.bottom)
-                        end.linkTo(tyreRear.start)
-                    }
-            )
-        }
-    }
+    MotorcycleLayout(modifier,
+        tyre = { location, tyreModifier -> Tyre(location, snackbarHostState, tyreModifier) },
+        reading = { location, readingModifier -> TyreStat(location, readingModifier) },
+        binding = { location, bindingModifier -> BindSensorButton(location, bindingModifier) },
+    )
 }
 
 @Composable

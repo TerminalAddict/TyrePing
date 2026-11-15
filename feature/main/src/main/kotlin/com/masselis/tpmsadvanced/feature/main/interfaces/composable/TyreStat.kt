@@ -2,6 +2,7 @@ package com.masselis.tpmsadvanced.feature.main.interfaces.composable
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -29,6 +30,7 @@ import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.window.Dialog
@@ -159,7 +161,7 @@ internal fun ReadingValues(
         if (size != ReadingSize.NORMAL) Alignment.CenterHorizontally else
         when (location) {
             is Location.Auxiliary -> Alignment.CenterHorizontally
-            is Location.Axle -> Alignment.Start
+            is Location.Axle -> Alignment.CenterHorizontally
             is Location.Wheel -> when (location.toSide()) {
                 LEFT -> Alignment.End
                 RIGHT -> Alignment.Start
@@ -174,7 +176,8 @@ internal fun ReadingValues(
     Column(
         modifier = modifier.alpha(if (isVisible) 1f else 0f).semantics(mergeDescendants = true) {
             contentDescription = buildString { appendLoc(location, withType = false, capitalized = true) }
-        }
+        },
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (state is State.Alerting) Text("WARNING", color = color, fontWeight = FontWeight.Bold)
         if (state == State.NotDetected) Text("Sensor not detected", color = color,
@@ -188,6 +191,7 @@ internal fun ReadingValues(
                 ReadingSize.CARD -> 32.sp
                 ReadingSize.MAGNIFIED -> 48.sp
             } * readability.scale,
+            lineHeight = READING_LINE_HEIGHT_EM.em,
             color = color,
             modifier = Modifier.align(alignment),
         )
@@ -196,6 +200,7 @@ internal fun ReadingValues(
             temperature?.let { (value, unit) -> value.string(unit) } ?: "-.-",
             fontWeight = FontWeight.SemiBold,
             fontSize = (if (size == ReadingSize.MAGNIFIED) 28.sp else 16.sp) * readability.scale,
+            lineHeight = READING_LINE_HEIGHT_EM.em,
             color = color,
             modifier = Modifier.align(alignment),
         )
@@ -204,6 +209,7 @@ internal fun ReadingValues(
             Text(
                 text = (if (it.isLow) "Low battery: " else "Battery: ") + it.label(),
                 fontSize = if (size == ReadingSize.NORMAL) 12.sp else 16.sp,
+                lineHeight = READING_LINE_HEIGHT_EM.em,
                 color = if (it.isLow) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.align(alignment),
             )
@@ -212,6 +218,7 @@ internal fun ReadingValues(
         loss?.let {
             Text("Possible leak (experimental): −${it.drop.string(checkNotNull(pressure).second)}",
                 fontSize = if (size == ReadingSize.NORMAL) 12.sp else 16.sp,
+                lineHeight = READING_LINE_HEIGHT_EM.em,
                 color = MaterialTheme.colorScheme.error, modifier = Modifier.align(alignment))
         }
 
@@ -237,7 +244,7 @@ internal fun ReadingValues(
             Text(
                 text = "$displaySensorId  Last: $lastReceived",
                 fontSize = if (size == ReadingSize.NORMAL) 9.sp else 12.sp,
-                maxLines = if (size == ReadingSize.NORMAL) 1 else 2,
+                lineHeight = READING_LINE_HEIGHT_EM.em,
                 color = color,
                 modifier = Modifier.align(alignment),
             )
@@ -245,7 +252,7 @@ internal fun ReadingValues(
                 Text(
                     text = "Last seen ${elapsedSinceUpdate(timestamp)} ago",
                     fontSize = if (size == ReadingSize.NORMAL) 9.sp else 12.sp,
-                    maxLines = 1,
+                    lineHeight = READING_LINE_HEIGHT_EM.em,
                     color = color,
                     modifier = Modifier.align(alignment),
                 )
@@ -326,6 +333,7 @@ internal fun nextElapsedTick(
         .coerceAtLeast(1.seconds)
 }
 
+private const val READING_LINE_HEIGHT_EM = 1.25f
 private const val MINUTES_PER_HOUR = 60L
 private const val HOURS_PER_DAY = 24L
 private const val SECONDS_PER_MINUTE = 60L

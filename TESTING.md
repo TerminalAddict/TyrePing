@@ -1,3 +1,44 @@
+# Motorcycle dashboard alignment — 16 November 2026
+
+Prepared on `codex/motorcycle-dashboard-layout` for the v0.12.3 pre-release. Validation below used
+version 0.12.2 before the release version bump. The reported portrait screenshot
+showed front readings painting over the Ready-to-Ride/actions area and rear metadata below the
+viewport. The old layout reserved 70% of the height for the motorcycle, then placed readings outside
+its bounds without accounting for their height or offering scrolling.
+
+The motorcycle layout now measures both complete reading blocks before allocating diagram space.
+It preserves the motorcycle illustration and sensor-management controls, fits ordinary text into the
+available space, and scrolls when large fonts or warning details require more room. Shared readouts
+use proportional line heights and spacing, with wrapping timestamps and freshness labels.
+
+Validation completed:
+
+- **84 JVM tests passed**: main 82 and phone 2, with zero failures, errors or skips.
+- Five new rendered layout tests check default text, enlarged system fonts, and a short viewport
+  with 200% system text plus 200% readout size. Geometry assertions verify separation from dashboard
+  controls and the diagram, and prove rear battery/leak/timestamp/freshness details are reachable.
+- Reviewed the rendered motorcycle, van, trailer-warning and magnified-reading screens.
+- Debug APK assembly and main-module Detekt passed. APK signature matches the existing Debug key.
+- Phone Debug lint passed with **0 errors and 19 existing warnings**.
+
+Install while retaining existing TyrePing Debug data:
+
+```powershell
+adb install -r "D:\TyrePing-Releases\debug\TyrePing-motorcycle-layout-debug.apk"
+```
+
+Package `nz.paulwillard.tyreping.debug`, version 0.12.2 / 1202000. APK: 90,245,760 bytes; SHA-256
+`f1b2723c4695c60b648741528264ca9799a3f382e7acc81c6d67581a69b4f01d`.
+Build/test logs are in `D:\TyrePing-Releases\motorcycle-layout-2026-11-16\`.
+Rendered reports are in `feature/main/build/reports/paparazzi/debug/`.
+
+On the phone, select the motorcycle with its existing sensor readings, check the front values remain
+below the action buttons, and scroll to the rear battery and last-seen details. Repeat with enlarged
+Android text, then tap a reading and a sensor-management button. Phone testing remains outstanding;
+the screenshot tests do not exercise physical touch or live BLE reception.
+
+---
+
 # Debug-only GitHub checker — 19 October 2026
 
 Prepared on `codex/debug-only-github-updater` for the v0.12.2 pre-release. The validation below used
